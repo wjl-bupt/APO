@@ -1,0 +1,76 @@
+# ===========================
+# 🌟 Experiment Configuration In Continous Action Space
+# ===========================
+experiment:
+  # Whether to use deterministic behavior in torch (ensures consistency in results)
+  torch_deterministic: true
+  # Enable CUDA if available; if false, CPU will be used
+  cuda: true
+  # Enable tracking with Weights and Biases (wandb)
+  track: true
+  # Name of the wandb project
+  wandb_project_name: "cleanrl-mujoco_debbugger"
+  # Whether to capture video of the agent's performance (stored in `videos` folder)
+  capture_video: false
+
+
+# ===========================
+# ⚡️ Algorithm Configuration
+# ===========================
+algorithm:
+  # Total number of timesteps for training
+  total_timesteps: 10000000
+  # Learning rate for the optimizer (usually Adam)
+  learning_rate: !!float 3e-4
+  # Number of parallel environments to run simultaneously
+  num_envs: 8
+  # Number of steps to run per environment during each policy rollout
+  num_steps: 256
+  # Enable learning rate annealing (gradually decrease learning rate during training)
+  anneal_lr: true
+  # Discount factor γ, used to compute discounted rewards
+  gamma: !!float 0.99
+  # GAE-lambda parameter for Generalized Advantage Estimation (GAE)
+  gae_lambda: !!float 0.95
+  # Number of mini-batches used during each update
+  num_minibatches: 4
+  # Number of epochs to update the policy during each training iteration
+  update_epochs: 10
+  # Whether to normalize advantages
+  norm_adv: true
+  # PPO clipping coefficient ε1 to limit policy updates
+  clip_coef: !!float 0.2
+  # Second clipping coefficient ε2 to clip ratio2
+  clip_coef_2: !!float 0.2
+  # Whether to use a clipped loss for the value function
+  clip_vloss: true
+  # Entropy coefficient to encourage exploration
+  ent_coef: !!float 0.0
+  # Coefficient for the value function loss
+  vf_coef: !!float 0.5
+  # Maximum norm for gradient clipping to prevent gradient explosion
+  max_grad_norm: !!float 0.5
+  # Target KL divergence threshold; if exceeded, training stops early
+  target_kl: !!float 0.01  # YAML does not support None, hence use 0.0
+
+# ===========================
+# 🕹️ Runtime Configuration
+# ===========================
+runtime:
+  # Batch size, computed dynamically during runtime
+  batch_size: 0
+  # Mini-batch size, computed dynamically during runtime
+  minibatch_size: 0
+  # Number of training iterations, computed dynamically during runtime
+  num_iterations: 0
+  # decay delta
+  decay_delta: !!float 1.0
+# ===========================
+# 🎲 Action Sample Configuration
+# ===========================
+action_sample:
+  # Number of actions to sample per step, different param between APPO and PPO-Clip
+  sample_action_num: 2
+  # ratio2 require grad
+  # require_grad: True
+
