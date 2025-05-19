@@ -26,25 +26,25 @@ Below, we give a description of the main files and directories in this repositor
 ```bash
 src/
 ├── algos
-│   └── ppo_family
-│       ├── appo
-│       │   ├── con_appo_trainer.py
-│       │   └── dis_appo_trainer.py
+│   └── ppo_family # algorithms
+│       ├── appo 
+│       │   ├── con_appo_trainer.py # appo for continous space
+│       │   └── dis_appo_trainer.py # appo for discrete space
 │       ├── base
 │       │   ├── base_trainer.py
-│       │   ├── con_policy_value.py
-│       │   └── dis_policy_value.py
+│       │   ├── con_policy_value.py # policy-value network for continous
+│       │   └── dis_policy_value.py # policy-value network for discrete
 │       ├── ppo_clip
-│       │   ├── con_ppo2_trainer.py
-│       │   └── dis_ppo2_trainer.py
+│       │   ├── con_ppo2_trainer.py # ppo-clip for continous space
+│       │   └── dis_ppo2_trainer.py # ppo-clip for discrete space
 │       ├── ppo_penalty
-│       │   ├── con_ppo1_trainer.py
-│       │   └── dis_ppo1_trainer.py
+│       │   ├── con_ppo1_trainer.py # ppo-penalty for continous space
+│       │   └── dis_ppo1_trainer.py # ppo-penalty for discrete space
 │       └── spo
 │           └── con_spo_trainer.py
 ├── buffer
-│   ├── base_buffer.py
-│   ├── con_buffer.py
+│   ├── base_buffer.py # replay buffer base class
+│   ├── con_buffer.py  # replacy buffer for continous space
 │   ├── dis_buffer.py
 │   └── __init__.py
 ├── conf
