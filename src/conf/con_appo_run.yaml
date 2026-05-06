@@ -61,5 +61,5 @@ algorithm:
 # ===========================
 action_sample:
   # Number of actions to sample per step
-  sample_action_num: 3
+  sample_action_num: 2
 

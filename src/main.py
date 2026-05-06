@@ -35,6 +35,12 @@ if __name__ == "__main__":
             from algos.ppo_family.ppo_clip.dis_ppo2_trainer import Discrete_PPO2_Trainer as Trainer
         elif args.algo == "ppo-penalty":
             from algos.ppo_family.ppo_penalty.dis_ppo1_trainer import Discrete_PPOPenalty_Trainer as Trainer
+        elif args.algo == "a2c":
+            from algos.a2c.dis_a2c_trainer import DiscreteA2CTrainer as Trainer
+        elif args.algo == "vmpo":
+            from algos.vmpo.dis_vmpo_trainer import DiscreteVMPOTeacherTrainer as Trainer
+        elif args.algo == "trpo":
+            from algos.trpo.dis_trpo_trainer import DiscreteTRPOTrainer as Trainer
         
     elif args.env_type == "mujoco":
         from runner import MujocoRunner as Runner
@@ -48,6 +54,18 @@ if __name__ == "__main__":
             from algos.ppo_family.ppo_penalty.con_ppo1_trainer import Continous_PPOPenalty_Trainer as Trainer
         elif args.algo == "spo":
             from algos.ppo_family.spo.con_spo_trainer import Continous_SPO_Trainer as Trainer
+        elif args.algo == "a2c":
+            from algos.a2c.con_a2c_trainer import ContinuousA2CTrainer as Trainer
+        elif args.algo == "vmpo":
+            from algos.vmpo.vmpo_trainer import VMPOTeacherTrainer as Trainer
+        elif args.algo == "trpo":
+            from algos.trpo.con_trpo_trainer import ContinuousTRPOTrainer as Trainer
+        elif args.algo == "a2c":
+            from algos.a2c.con_a2c_trainer import ContinuousA2CTrainer as Trainer
+        elif args.algo == "vmpo":
+            from algos.vmpo.vmpo_trainer import VMPOTeacherTrainer as Trainer
+        elif args.algo == "trpo":
+            from algos.trpo.con_trpo_trainer import ContinuousTRPOTrainer as Trainer
     else:
         args.logger.error(f"env_type:{args.env_type} hasn't not yet implemented! Only Support ['mujoco', 'atari]")
         sys.exit({"ExitCode": 1, "ErrorType": "NotImplementedError"})

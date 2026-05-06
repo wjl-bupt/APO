@@ -7,20 +7,20 @@ seeds=(1 2 3 4 5)
 update_epochs=(10)
 envs=(
     # vcis 12
-    # "HumanoidStandup-v5"
-    # "Humanoid-v5"
-    # "Swimmer-v5"
+    "HumanoidStandup-v5"
+    "Humanoid-v5"
+    "Swimmer-v5"
 
     # vcis 7
     "HalfCheetah-v5"
-    # "Ant-v5"
+    "Ant-v5"
 
     # vcis 13
-    # "Hopper-v5"
-    # "Reacher-v5"
-    # "Walker2d-v5"
-    # "InvertedDoublePendulum-v5"
-    # "InvertedPendulum-v5"
+    "Hopper-v5"
+    "Reacher-v5"
+    "Walker2d-v5"
+    "InvertedDoublePendulum-v5"
+    "InvertedPendulum-v5"
 )
 
 
@@ -43,9 +43,17 @@ do
         for e in "${update_epochs[@]}"
         do
             echo "ppo-clip continous action space"
-            CUDA_VISIBLE_DEVICES=0,1,2,3 python -m src.main --seed $seed  --yaml $CONFIG_PATH --env_id $env_id --env_type $exp   --algo $algo     
+            CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python -m src.main \
+                --seed $seed \
+                --yaml $CONFIG_PATH \
+                --env_id $env_id \
+                --env_type $exp \
+                --algo $algo &
         done
-        echo "Experiment with env=$env_id seed=$seed finished."
+        echo "Experiment with env=$env_id seed=$seed started."
     done
+    wait
 done
+
+echo "All experiments finished."
 

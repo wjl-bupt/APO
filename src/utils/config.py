@@ -20,7 +20,7 @@ def add_fixed_arguments(parser, args = None):
     parser.add_argument('--env_id', type=str, default=args.env_id if args != None else None, help="The id of the environment")
     parser.add_argument('--yaml', type=str, default=args.yaml if args != None else None, help="configuration file to launch exp through toml file!")
     parser.add_argument('--seed', type=int, default=args.seed if args != None else None, help="The id of the environment")
-    parser.add_argument('--algo', type=str, default=args.algo if args != None else None, help="Which algorithm to test", choices=["appo","ppo-clip", "ppo-penalty", "ppo2-kl","ppo2-ent", "spo"])
+    parser.add_argument('--algo', type=str, default=args.algo if args != None else None, help="Which algorithm to test", choices=["appo","ppo-clip", "ppo-penalty", "ppo2-kl","ppo2-ent", "spo", "a2c", "vmpo", "trpo"])
 
 def get_conf():
     parser = argparse.ArgumentParser(description="Anchor PPO Exeperiment")
@@ -39,6 +39,28 @@ def get_conf():
     for BigClass, Dict_ in yaml_config.items():
         for param, value in Dict_.items():
             parser.add_argument(f"--{param}", type=type(value), default=value)
+
+    # Add algorithm-specific parameters
+    # A2C specific parameters
+    parser.add_argument('--entropy_coef', type=float, default=0.01, help='Entropy coefficient for A2C')
+    # parser.add_argument('--gamma', type=float, default=0.99, help='Discount factor')
+    parser.add_argument('--value_loss_coef', type=float, default=0.25, help='Value loss coefficient for A2C')
+    
+    # V-MPO specific parameters
+    parser.add_argument('--vmpo_epsilon', type=float, default=0.1, help='V-MPO epsilon parameter')
+    parser.add_argument('--vmpo_epsilon_mean', type=float, default=0.1, help='V-MPO epsilon mean parameter')
+    parser.add_argument('--vmpo_epsilon_std', type=float, default=0.01, help='V-MPO epsilon std parameter')
+    parser.add_argument('--vmpo_epsilon_value', type=float, default=0.05, help='V-MPO epsilon value parameter')
+    parser.add_argument('--vmpo_temperature_eta', type=float, default=1.0, help='V-MPO temperature eta')
+    parser.add_argument('--vmpo_temperature_alpha_mean', type=float, default=1.0, help='V-MPO temperature alpha mean')
+    parser.add_argument('--vmpo_temperature_alpha_std', type=float, default=1.0, help='V-MPO temperature alpha std')
+    parser.add_argument('--vmpo_temperature_alpha_value', type=float, default=1.0, help='V-MPO temperature alpha value')
+    
+    # TRPO specific parameters
+    parser.add_argument('--max_kl', type=float, default=0.01, help='Maximum KL divergence for TRPO')
+    parser.add_argument('--cg_damping', type=float, default=0.1, help='Conjugate gradient damping for TRPO')
+    parser.add_argument('--line_search_coef', type=float, default=0.8, help='Line search coefficient for TRPO')
+    parser.add_argument('--max_backtracks', type=float, default=10, help='Maximum backtracking steps for TRPO')
 
     # Parse remaining arguments, allowing command-line overrides
     args = parser.parse_args(remaining_argv)

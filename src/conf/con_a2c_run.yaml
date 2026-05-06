@@ -1,0 +1,18 @@
+training:
+  learning_rate: 3e-4
+  num_envs: 1
+  num_steps: 2048
+  total_timesteps: 1000000
+  update_epochs: 10
+  num_minibatches: 32
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_coef: 0.2
+  clip_vloss: True
+  norm_adv: True
+  vf_coef: 0.25
+  ent_coef: 0.01
+  max_grad_norm: 0.5
+  decay_delta: 0.995
+  entropy_coef: 0.01
+  value_loss_coef: 0.25

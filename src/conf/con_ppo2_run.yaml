@@ -45,7 +45,7 @@ algorithm:
   # Whether to use a clipped loss for the value function
   clip_vloss: true
   # Entropy coefficient to encourage exploration
-  ent_coef: !!float 0.01
+  ent_coef: !!float 0.0
   # Coefficient for the value function loss
   vf_coef: !!float 0.5
   # Maximum norm for gradient clipping to prevent gradient explosion
