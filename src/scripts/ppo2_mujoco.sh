@@ -43,7 +43,7 @@ do
         for e in "${update_epochs[@]}"
         do
             echo "ppo-clip continous action space"
-            CUDA_VISIBLE_DEVICES=0,1,2,3 uv run python -m src.main \
+            CUDA_VISIBLE_DEVICES=1,2,3 python -m src.main \
                 --seed $seed \
                 --yaml $CONFIG_PATH \
                 --env_id $env_id \

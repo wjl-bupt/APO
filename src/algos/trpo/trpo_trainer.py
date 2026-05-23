@@ -11,6 +11,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import torch.optim as optim
 from ..ppo_family.base.base_trainer import BaseTrainer
 
 def compute_kl_divergence(self, obs, actions, old_logprobs):
@@ -22,23 +23,23 @@ def compute_kl_divergence(self, obs, actions, old_logprobs):
         kl_div = old_logprobs - new_logprob
     return kl_div
 
-def fisher_vector_product(self, vector, obs, actions, logprobs):
-    """
-    Compute Fisher Information Matrix-vector product
-    """
-    kl = self.compute_kl_divergence(obs, actions, logprobs)
-    kl = kl.mean()
+# def fisher_vector_product(self, vector, obs, actions, logprobs):
+#     """
+#     Compute Fisher Information Matrix-vector product
+#     """
+#     kl = self.compute_kl_divergence(obs, actions, logprobs)
+#     kl = kl.mean()
     
-    # First gradient
-    grads = torch.autograd.grad(kl, self.agent.parameters(), create_graph=True)
-    flat_grad_kl = torch.cat([grad.flatten() for grad in grads])
+#     # First gradient
+#     grads = torch.autograd.grad(kl, self.agent.parameters(), create_graph=False)
+#     flat_grad_kl = torch.cat([grad.flatten() for grad in grads])
     
-    # Second gradient (Fisher-vector product)
-    grad_vector_product = torch.dot(flat_grad_kl, vector)
-    fisher_vector = torch.autograd.grad(grad_vector_product, self.agent.parameters())
-    flat_fisher_vector = torch.cat([grad.flatten() for grad in fisher_vector])
+#     # Second gradient (Fisher-vector product)
+#     grad_vector_product = torch.dot(flat_grad_kl, vector)
+#     fisher_vector = torch.autograd.grad(grad_vector_product, self.agent.parameters())
+#     flat_fisher_vector = torch.cat([grad.flatten() for grad in fisher_vector])
     
-    return flat_fisher_vector + self.cg_damping * vector
+#     return flat_fisher_vector + self.cg_damping * vector
 
 
 class TRPOTrainer(BaseTrainer):
@@ -48,6 +49,8 @@ class TRPOTrainer(BaseTrainer):
         self.cg_damping = args.cg_damping if hasattr(args, 'cg_damping') else 0.1
         self.line_search_coef = args.line_search_coef if hasattr(args, 'line_search_coef') else 0.8
         self.max_backtracks = args.max_backtracks if hasattr(args, 'max_backtracks') else 10
+        self.value_optimizer = torch.optim.Adam(self.agent.critic.parameters(), lr=2.5e-4)
+        self.optimizer = torch.optim.Adam(list(self.agent.actor_mean.parameters()) + [self.agent.actor_logstd], lr=2.5e-4)
 
     def conjugate_gradient(self, A, b, nsteps, residual_tol=1e-10):
         """
@@ -93,106 +96,246 @@ class TRPOTrainer(BaseTrainer):
             param.grad = flat_grad[idx:idx+num_params].view(param.shape)
             idx += num_params
 
-    def fisher_vector_product(self, vector, obs, actions, logprobs):
-        """
-        Compute Fisher Information Matrix-vector product
-        """
-        kl = self.agent.compute_kl_divergence(obs, actions, logprobs)
-        kl = kl.mean()
+    # def fisher_vector_product(self, vector, obs, actions, logprobs):
+    #     """
+    #     Compute Fisher Information Matrix-vector product
+    #     """
+    #     kl = self.agent.compute_kl_divergence(obs, actions, logprobs)
+    #     kl = kl.mean()
         
-        # First gradient
-        grads = torch.autograd.grad(kl, self.agent.parameters(), create_graph=True)
-        flat_grad_kl = torch.cat([grad.flatten() for grad in grads])
+    #     # First gradient
+    #     grads = torch.autograd.grad(kl, self.agent.parameters(), create_graph=False)
+    #     flat_grad_kl = torch.cat([grad.flatten() for grad in grads])
         
-        # Second gradient (Fisher-vector product)
-        grad_vector_product = torch.dot(flat_grad_kl, vector)
-        fisher_vector = torch.autograd.grad(grad_vector_product, self.agent.parameters())
-        flat_fisher_vector = torch.cat([grad.flatten() for grad in fisher_vector])
+    #     # Second gradient (Fisher-vector product)
+    #     grad_vector_product = torch.dot(flat_grad_kl, vector)
+    #     fisher_vector = torch.autograd.grad(grad_vector_product, self.agent.parameters())
+    #     flat_fisher_vector = torch.cat([grad.flatten() for grad in fisher_vector])
         
-        return flat_fisher_vector + self.cg_damping * vector
+    #     return flat_fisher_vector + self.cg_damping * vector
 
-    def update(self, data):
+    def update_one_episode(self, data):
         """
-        Perform one update step for TRPO
+        TRPO (actor) + minibatch critic update
         """
-        b_obs, b_actions, b_returns, b_values, b_logprobs = data
-        
-        # Calculate advantages
+
+        b_obs, b_logprobs, b_actions, advantages, b_returns, b_values, means, stds = data
+        ratio_stats = []
+        kl_stats = []
+        policy_losses = []
+        value_losses = []
+        entropy_stats = []
+
+        min_ratio, max_ratio = 10.0, 0.0
+        # =========================================================
+        # 0. ADVANTAGE
+        # =========================================================
         advantages = b_returns - b_values
+
         if self.norm_adv:
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-        
-        # Compute policy gradient
-        old_params = self.flatten_parameters(self.agent.parameters()).clone()
-        
-        # Forward pass to get log probabilities and values
-        _, new_logprob, entropy, new_value, _ = self.agent.get_action_and_value(b_obs, b_actions)
-        
-        # Calculate policy loss (negative of expected advantage)
-        ratio = torch.exp(new_logprob - b_logprobs)
-        pg_loss = -(advantages.detach() * ratio).mean()
-        
-        # Compute gradient
-        self.optimizer.zero_grad()
-        pg_loss.backward()
-        policy_gradient = self.flatten_grad(self.agent.parameters()).detach()
-        
-        # Compute Fisher Information Matrix-vector product
-        fvp = lambda v: self.fisher_vector_product(v, b_obs, b_actions, b_logprobs)
-        
-        # Solve for step direction using conjugate gradient
-        stepdir = self.conjugate_gradient(fvp, policy_gradient, 10)
-        
-        # Compute step size
-        shs = 0.5 * torch.dot(stepdir, self.fisher_vector_product(stepdir, b_obs, b_actions, b_logprobs))
-        lagrange_multiplier = torch.sqrt(2 * self.max_kl / shs)
-        step = stepdir / lagrange_multiplier
-        
-        # Line search to find best step size
-        old_loss = pg_loss.item()
-        current_params = self.flatten_parameters(self.agent.parameters()).clone()
-        
-        success = False
-        for j in range(self.max_backtracks):
-            # Update parameters
-            new_params = current_params - self.line_search_coef ** j * step
-            self._set_flat_params(self.agent.parameters(), new_params)
-            
-            # Evaluate new policy
-            with torch.no_grad():
-                _, new_logprob_new, _, new_value_new, _ = self.agent.get_action_and_value(b_obs, b_actions)
-                ratio_new = torch.exp(new_logprob_new - b_logprobs)
-                new_pg_loss = -(advantages.detach() * ratio_new).mean()
-                
-                # Check if improvement is sufficient
-                if new_pg_loss <= old_loss:
-                    success = True
-                    break
-        
-        if not success:
-            # If line search failed, revert to original parameters
-            self._set_flat_params(self.agent.parameters(), old_params)
-        
-        # Compute final value loss
-        value_loss = self.compute_value_loss(b_returns, b_values, new_value)
-        
-        # Log metrics
-        with torch.no_grad():
-            _, final_logprob, final_entropy, final_value, _ = self.agent.get_action_and_value(b_obs, b_actions)
-            final_ratio = torch.exp(final_logprob - b_logprobs)
-            approx_kl = ((final_ratio - 1) - (final_logprob - b_logprobs)).mean()
-            clipfrac = ((final_ratio - 1.0).abs() > 0.02).float().mean()
-            
-            mini_dict_ = self.log_dict_(
-                losses_value_loss=value_loss.item(),
-                losses_policy_loss=new_pg_loss.item() if success else old_loss,
-                losses_entropy=final_entropy.mean().item(),
-                losses_approx_kl=approx_kl.item(),
-                losses_clipfrac=clipfrac.item(),
-                train_step_successful=success
+
+        advantages = advantages.detach()
+
+        # =========================================================
+        # 1. OLD POLICY (for KL constraint)
+        # =========================================================
+        old_means = means.detach()
+        old_stds = stds.detach()
+
+        batch_size = b_obs.shape[0]
+        b_inds = torch.randperm(batch_size, device=b_obs.device)
+
+        policy_params = list(self.agent.actor_mean.parameters()) + [self.agent.actor_logstd]
+
+        # =========================================================
+        # 2. LOG PROB FUNCTION
+        # =========================================================
+        def log_prob_gaussian(a, mu, std):
+            var = std ** 2
+            return -0.5 * (((a - mu) ** 2) / var + torch.log(var) + 2 * np.log(2 * np.pi)).sum(-1)
+
+        # =========================================================
+        # 3. POLICY GRADIENT (MINI-BATCH)
+        # =========================================================
+        policy_grads = []
+
+        for start in range(0, batch_size, self.mini_batch_size):
+            end = start + self.mini_batch_size
+            mb_inds = b_inds[start:end]
+
+            mb_obs = b_obs[mb_inds]
+            mb_actions = b_actions[mb_inds]
+            mb_logprobs = b_logprobs[mb_inds]
+            mb_adv = advantages[mb_inds]
+
+            new_means, _ = self.agent.get_dist_mean_and_std(mb_obs)
+            new_logstd = self.agent.actor_logstd.expand_as(new_means)
+            new_stds = torch.exp(new_logstd)
+
+            new_logprob = log_prob_gaussian(mb_actions, new_means, new_stds)
+            ratio = torch.exp(new_logprob - mb_logprobs)
+
+            pg_loss = -(ratio * mb_adv).mean()
+
+            self.optimizer.zero_grad()
+            pg_loss.backward()
+
+            policy_grads.append(self.flatten_grad(policy_params).detach())
+
+        policy_gradient = torch.stack(policy_grads).mean(0)
+
+        # =========================================================
+        # 4. KL FUNCTION (FULL BATCH)
+        # =========================================================
+        def kl_fn():
+            new_means, new_logstd = self.agent.get_dist_mean_and_std(b_obs)
+            new_stds = torch.exp(new_logstd)
+
+            kl = (
+                torch.log(new_stds / old_stds)
+                + (old_stds ** 2 + (old_means - new_means) ** 2) / (2.0 * new_stds ** 2)
+                - 0.5
+            ).sum(-1).mean()
+
+            return kl
+
+        kl = kl_fn().detach()
+
+        # =========================================================
+        # 5. FISHER VECTOR PRODUCT
+        # =========================================================
+        def fisher_vector_product(v):
+
+            new_means, new_logstd = self.agent.get_dist_mean_and_std(b_obs)
+            new_stds = torch.exp(new_logstd)
+
+            kl = (
+                torch.log(new_stds / old_stds)
+                + (old_stds ** 2 + (old_means - new_means) ** 2) / (2.0 * new_stds ** 2)
+                - 0.5
+            ).sum(-1).mean()
+
+            grads = torch.autograd.grad(
+                kl,
+                policy_params,
+                retain_graph=True,
+                create_graph=False
             )
-        
-        return mini_dict_
+
+            flat_grad = torch.cat([g.reshape(-1) for g in grads])
+
+            return flat_grad @ v + self.cg_damping * v
+
+        # =========================================================
+        # 6. CONJUGATE GRADIENT
+        # =========================================================
+        stepdir = self.conjugate_gradient(
+            fisher_vector_product,
+            policy_gradient,
+            10
+        )
+
+        shs = 0.5 * torch.dot(stepdir, fisher_vector_product(stepdir))
+        step_size = torch.sqrt(2 * self.max_kl / (shs + 1e-8))
+        full_step = stepdir * step_size
+
+        # =========================================================
+        # 7. LINE SEARCH
+        # =========================================================
+        old_params = self.flatten_parameters(policy_params).clone()
+
+        def surrogate_loss(obs, actions, logprobs, adv):
+            new_means, _ = self.agent.get_dist_mean_and_std(obs)
+            new_logstd = self.agent.actor_logstd.expand_as(new_means)
+            new_stds = torch.exp(new_logstd)
+
+            new_logprob = log_prob_gaussian(actions, new_means, new_stds)
+            ratio = torch.exp(new_logprob - logprobs)
+
+            return -(ratio * adv).mean()
+
+        success = False
+        best_loss = float("inf")
+
+        for j in range(int(self.max_backtracks)):
+
+            coeff = self.line_search_coef ** j
+            new_params = old_params + coeff * full_step
+
+            self._set_flat_params(policy_params, new_params)
+
+            with torch.no_grad():
+
+                test_loss = surrogate_loss(
+                    b_obs, b_actions, b_logprobs, advantages
+                )
+
+                test_means, test_logstd = self.agent.get_dist_mean_and_std(b_obs)
+                test_stds = torch.exp(test_logstd)
+
+                var0 = old_stds ** 2
+                var1 = test_stds ** 2
+
+                kl_test = (
+                    torch.log(test_stds / old_stds)
+                    + (var0 + (old_means - test_means) ** 2) / (2.0 * var1)
+                    - 0.5
+                ).sum(-1).mean()
+
+            if kl_test <= self.max_kl and test_loss <= best_loss:
+                success = True
+                best_loss = test_loss.item()
+                break
+
+        if not success:
+            self._set_flat_params(policy_params, old_params)
+
+        # =========================================================
+        # 8. VALUE FUNCTION UPDATE (MINI-BATCH SGD)
+        # =========================================================
+        value_losses = []
+
+        for start in range(0, batch_size, self.mini_batch_size):
+            end = start + self.mini_batch_size
+            mb_inds = b_inds[start:end]
+
+            new_value = self.agent.get_value(b_obs[mb_inds])
+
+            value_loss = ((new_value - b_returns[mb_inds]) ** 2).mean()
+            value_losses.append(value_loss.detach().item())
+
+        # value_loss = torch.stack(value_losses).mean()
+
+            self.value_optimizer.zero_grad()
+            value_loss.backward()
+            self.value_optimizer.step()
+
+        # =========================================================
+        # 9. ENTROPY
+        # =========================================================
+        with torch.no_grad():
+            new_means, new_logstd = self.agent.get_dist_mean_and_std(b_obs)
+            entropy = new_logstd.sum(-1).mean()
+
+        mini_dict_ = self.log_dict_(
+            losses_policy_loss=pg_loss.mean().item(),
+            losses_value_loss=value_loss.mean().item(),
+            losses_entropy=entropy.mean().item(),
+            # TRPO core
+            losses_kl=kl.item(),
+        )
+        yield mini_dict_
+        # # =========================================================
+        # # 10. LOGGING
+        # # =========================================================
+        # return self.log_dict_(
+        #     losses_value_loss=value_loss.item(),
+        #     losses_policy_loss=best_loss,
+        #     losses_entropy=entropy.item(),
+        #     losses_approx_kl=kl.item(),
+        #     train_step_successful=success
+        # )
 
     def _set_flat_params(self, parameters, flat_params):
         """

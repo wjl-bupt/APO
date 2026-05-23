@@ -77,3 +77,40 @@ class Continous_PolicyValue(nn.Module):
         # ppo更新时计算新的log_probs
         log_probs = self.get_logprobs(actions = action, probs = probs)
         return action, log_probs, probs.entropy().sum(1), self.critic(x), probs
+
+    def compute_kl_divergence(self, obs, old_means, old_stds):
+        """
+        KL(old policy || current policy)
+
+        old: 来自 buffer (means, stds)
+        new: 当前网络输出
+        """
+
+        # current policy
+        new_means = self.actor_mean(obs)
+        new_logstd = self.actor_logstd.expand_as(new_means)
+        new_stds = torch.exp(new_logstd)
+
+        # numerical safety
+        old_stds = torch.clamp(old_stds, min=1e-6)
+        new_stds = torch.clamp(new_stds, min=1e-6)
+
+        # Gaussian KL (diagonal)
+        # KL(N0 || N1)
+        # = log(std1/std0) + (std0^2 + (mu0-mu1)^2)/(2*std1^2) - 0.5
+
+        var0 = old_stds ** 2
+        var1 = new_stds ** 2
+
+        kl = (
+            torch.log(new_stds / old_stds)
+            + (var0 + (old_means - new_means) ** 2) / (2.0 * var1)
+            - 0.5
+        )
+
+        return kl.sum(dim=-1)  # shape: [batch]
+    
+    
+    def get_dist_mean_and_std(self, obs):
+        mean = self.actor_mean(obs)
+        return mean, self.actor_logstd

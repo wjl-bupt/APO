@@ -24,6 +24,14 @@ class BaseRunner(ABC):
         self.all_args = config['all_args']
         self.env_id = self.all_args.env_id
         self.envs = config['envs']
+        self.group_keys = {
+            "env_id": "",
+            "algo": "",
+            "learning_rate": "lr",
+            "update_epochs": "epochs",
+            "ent_coef": "ent",
+            "sample_action_num": "sample",
+        }
 
         # Logger and experiment tracking
         self.setup_logging()
@@ -35,6 +43,7 @@ class BaseRunner(ABC):
         self.start_time = time.time()
         self.global_step = 0
         self.next_obs, self.next_done = None, None
+
         
 
     def env_reset(self):
@@ -45,7 +54,19 @@ class BaseRunner(ABC):
         next_obs, _ = self.envs.reset(seed=self.all_args.seed)
         self.next_obs = torch.Tensor(next_obs).to(self.all_args.device)
         self.next_done = torch.zeros(self.all_args.num_envs).to(self.all_args.device)
-    
+
+    def build_group_name(self, args):
+        parts = []
+
+        for k in self.group_keys:
+            abbr = self.group_keys[k]
+            v = getattr(args, k)
+            if isinstance(v, float):
+                v = f"{v:g}"
+
+            parts.append(f"{abbr}{v}")
+
+        return "_".join(parts)
 
     def setup_logging(self):
         """Setup wandb and TensorBoard logging."""
@@ -54,7 +75,7 @@ class BaseRunner(ABC):
         if self.all_args.track:
             wandb.init(
                 project=self.all_args.wandb_project_name,
-                group=self.all_args.exp_name + "_pi_old_ent",
+                group=self.build_group_name(self.all_args),
                 sync_tensorboard=True,
                 config=vars(self.all_args),
                 name=self.run_name,

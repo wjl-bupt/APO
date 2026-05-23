@@ -9,7 +9,7 @@ experiment:
   # Enable tracking with Weights and Biases (wandb)
   track: true
   # Name of the wandb project
-  wandb_project_name: "cleanrl-mujocov5_v1"
+  wandb_project_name: "apo"
   # Whether to capture video of the agent's performance (stored in `videos` folder)
   capture_video: false
 

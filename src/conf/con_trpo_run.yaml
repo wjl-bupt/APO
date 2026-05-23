@@ -1,20 +1,37 @@
 training:
-  learning_rate: 3e-4
-  num_envs: 1
-  num_steps: 2048
-  total_timesteps: 1000000
+  learning_rate: !!float 3e-4
+  num_envs: 8
+  num_steps: 128
+  total_timesteps: 10000000
   update_epochs: 1
-  num_minibatches: 1
-  gamma: 0.99
-  gae_lambda: 0.95
-  clip_coef: 0.2
-  clip_vloss: True
-  norm_adv: True
-  vf_coef: 0.25
-  ent_coef: 0.01
-  max_grad_norm: 0.5
-  decay_delta: 0.995
-  max_kl: 0.01
-  cg_damping: 0.1
-  line_search_coef: 0.8
-  max_backtracks: 10
+  num_minibatches: 4
+  gamma: !!float 0.99
+  gae_lambda: !!float 0.95
+  clip_coef: !!float 0.2
+  clip_vloss: true
+  norm_adv: true
+  vf_coef: !!float 0.25
+  ent_coef: !!float 0.01
+  max_grad_norm: !!float 0.5
+  decay_delta: !!float 0.995
+  target_kl: !!float 0.01  # YAML does not support None, hence use 0.0
+  anneal_lr: true
+  # max_kl: 0.01
+  # cg_damping: 0.1
+  # line_search_coef: 0.8
+  # max_backtracks: 10
+action_sample:
+  # Number of actions to sample per step, different param between APPO and PPO-Clip
+  sample_action_num: 1
+
+experiment:
+  # Whether to use deterministic behavior in torch (ensures consistency in results)
+  torch_deterministic: true
+  # Enable CUDA if available; if false, CPU will be used
+  cuda: true
+  # Enable tracking with Weights and Biases (wandb)
+  track: false
+  # Name of the wandb project
+  wandb_project_name: "apo"
+  # Whether to capture video of the agent's performance (stored in `videos` folder)
+  capture_video: false

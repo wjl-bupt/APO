@@ -36,7 +36,7 @@ envs=(
 #         done
 #         echo "Experiment with seed=$seed finished."
 #     done
-# done
+# done ps aux | grep "apo" | grep -v grep | awk '{print $2}' | xargs kill -9
 
 for env_id in "${envs[@]}"
 do
@@ -46,7 +46,7 @@ do
         do
             echo "appo continous action space"
             appo_yaml="src/conf/con_appo_run.yaml"
-            CUDA_VISIBLE_DEVICES=1,2,3 uv run python -m src.main \
+            CUDA_VISIBLE_DEVICES=1,2,3 python -m src.main \
                 --seed $seed \
                 --yaml $appo_yaml \
                 --env_id $env_id \
