@@ -176,7 +176,7 @@ class TRPOTrainer(BaseTrainer):
             new_logprob = log_prob_gaussian(mb_actions, new_means, new_stds)
             ratio = torch.exp(new_logprob - mb_logprobs)
 
-            pg_loss = -(ratio * mb_adv).mean()
+            pg_loss = (ratio * mb_adv).mean()
 
             self.optimizer.zero_grad()
             pg_loss.backward()
@@ -219,13 +219,14 @@ class TRPOTrainer(BaseTrainer):
             grads = torch.autograd.grad(
                 kl,
                 policy_params,
-                retain_graph=True,
-                create_graph=False
+                create_graph=True,
             )
 
             flat_grad = torch.cat([g.reshape(-1) for g in grads])
+            gv = torch.dot(flat_grad, v)
+            hvp = torch.autograd.grad(gv, policy_params)
 
-            return flat_grad @ v + self.cg_damping * v
+            return torch.cat([g.reshape(-1) for g in hvp]) + self.cg_damping * v
 
         # =========================================================
         # 6. CONJUGATE GRADIENT
